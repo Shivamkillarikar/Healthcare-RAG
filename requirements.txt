@@ -8,3 +8,5 @@ pypdf
 sentence-transformers
 python-dotenv
 tiktoken
+torch
+torchvision
