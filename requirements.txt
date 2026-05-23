@@ -2,9 +2,9 @@ streamlit
 langchain==0.2.16
 langchain-community==0.2.16
 langchain-google-genai
+langchain-text-splitters
 chromadb
 pypdf
 sentence-transformers
 python-dotenv
 tiktoken
-langchain-text-splitter
