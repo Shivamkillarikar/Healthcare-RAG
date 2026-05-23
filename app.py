@@ -3,6 +3,8 @@ import tempfile
 
 import streamlit as st
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage, AIMessage
+
 from rag_pipeline import process_pdf, load_chain
 
 load_dotenv()
@@ -19,6 +21,8 @@ st.markdown("Upload medical PDFs and ask healthcare-related questions.")
 # Session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "retriever" not in st.session_state:
+    st.session_state.retriever = None
 if "chain" not in st.session_state:
     st.session_state.chain = None
 if "processed_file" not in st.session_state:
@@ -30,9 +34,7 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Upload Healthcare PDF", type=["pdf"])
 
     if uploaded_file:
-        # ✅ Fix 1: only re-process if it's a new file
         if uploaded_file.name != st.session_state.processed_file:
-            # ✅ Fix 2: suffix + flush + cleanup
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(uploaded_file.read())
                 tmp.flush()
@@ -41,14 +43,16 @@ with st.sidebar:
             try:
                 with st.spinner("Processing PDF..."):
                     process_pdf(temp_path)
-                    st.session_state.chain = load_chain()
+                    retriever, chain = load_chain()
+                    st.session_state.retriever = retriever
+                    st.session_state.chain = chain
                     st.session_state.processed_file = uploaded_file.name
-                    st.session_state.chat_history = []  # clear old chat
+                    st.session_state.chat_history = []
                 st.success(f"✓ {uploaded_file.name} processed!")
             except Exception as e:
                 st.error(f"Failed to process PDF: {e}")
             finally:
-                os.unlink(temp_path)  # always clean up temp file
+                os.unlink(temp_path)
         else:
             st.info(f"✓ {uploaded_file.name} already loaded.")
 
@@ -56,7 +60,7 @@ with st.sidebar:
         if st.button("Clear chat"):
             st.session_state.chat_history = []
 
-# ✅ Fix 3: display history BEFORE input
+# Display chat history
 for sender, message in st.session_state.chat_history:
     role = "user" if sender == "You" else "assistant"
     with st.chat_message(role):
@@ -70,7 +74,7 @@ for sender, message in st.session_state.chat_history:
         else:
             st.write(message)
 
-# Input
+# Chat input
 question = st.chat_input("Ask a medical question...")
 
 if question:
@@ -83,22 +87,39 @@ if question:
         with st.chat_message("assistant"):
             with st.spinner("Generating response..."):
                 try:
-                    response = st.session_state.chain.invoke({"question": question})
-                    answer = response["answer"]
-                    # ✅ Fix 5: capture sources
-                    sources = response.get("source_documents", [])
+                    # Build message history for prompt
+                    history = []
+                    for sender, msg in st.session_state.chat_history:
+                        if sender == "You":
+                            history.append(HumanMessage(content=msg))
+                        else:
+                            content = msg["answer"] if isinstance(msg, dict) else msg
+                            history.append(AIMessage(content=content))
+
+                    # Retrieve relevant chunks
+                    docs = st.session_state.retriever.invoke(question)
+                    context = "\n\n".join(d.page_content for d in docs)
+
+                    # Run chain
+                    answer = st.session_state.chain.invoke({
+                        "context": context,
+                        "chat_history": history,
+                        "question": question
+                    })
 
                     st.write(answer)
-                    if sources:
-                        with st.expander(f"📄 Sources ({len(sources)})"):
-                            for doc in sources:
+
+                    if docs:
+                        with st.expander(f"📄 Sources ({len(docs)})"):
+                            for doc in docs:
                                 page = doc.metadata.get("page", "?")
                                 st.caption(f"Page {page + 1}: {doc.page_content[:300]}…")
 
                     st.session_state.chat_history.append(("You", question))
                     st.session_state.chat_history.append(
-                        ("AI", {"answer": answer, "sources": sources})
+                        ("AI", {"answer": answer, "sources": docs})
                     )
+
                 except Exception as e:
                     st.error(f"Error generating response: {e}")
 
