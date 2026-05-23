@@ -1,12 +1,14 @@
 import os
-
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain_google_genai import ChatGoogleGenerativeAI
+
+if not os.getenv("GOOGLE_API_KEY"):
+    raise EnvironmentError("GOOGLE_API_KEY is not set.")
 
 CHROMA_PATH = "chroma_db"
 
@@ -16,16 +18,13 @@ embeddings = HuggingFaceEmbeddings(
 
 
 def process_pdf(pdf_path):
-
     loader = PyPDFLoader(pdf_path)
-
     docs = loader.load()
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200
     )
-
     chunks = splitter.split_documents(docs)
 
     vectordb = Chroma.from_documents(
@@ -33,14 +32,12 @@ def process_pdf(pdf_path):
         embedding=embeddings,
         persist_directory=CHROMA_PATH
     )
-
-    vectordb.persist()
+    # ✅ No .persist() — Chroma handles it automatically
 
     return vectordb
 
 
 def load_chain():
-
     vectordb = Chroma(
         persist_directory=CHROMA_PATH,
         embedding_function=embeddings
@@ -52,7 +49,8 @@ def load_chain():
 
     memory = ConversationBufferMemory(
         memory_key="chat_history",
-        return_messages=True
+        return_messages=True,
+        output_key="answer"          # ✅ fix ambiguous key
     )
 
     llm = ChatGoogleGenerativeAI(
@@ -63,7 +61,9 @@ def load_chain():
     chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
-        memory=memory
+        memory=memory,
+        return_source_documents=True,
+        output_key="answer"          # ✅ match memory output_key
     )
 
     return chain
