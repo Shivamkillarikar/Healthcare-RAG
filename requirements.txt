@@ -1,24 +1,10 @@
-# App
-streamlit>=1.40.0
-
-# LangChain core
+streamlit
 langchain>=0.3.7
 langchain-community>=0.3.7
 langchain-text-splitters>=0.3.0
-
-# Integrations (match your imports)
 langchain-huggingface>=0.1.0
-langchain-chroma>=0.1.4
 langchain-google-genai>=2.0.0
-
-# Vector store
-chromadb>=0.5.0
-
-# Embeddings
+faiss-cpu                        # ← replaces chromadb + langchain-chroma
 sentence-transformers>=3.0.0
-
-# Document loading
 pypdf>=5.0.0
-
-# Utils
 python-dotenv>=1.0.0
