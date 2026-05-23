@@ -6,7 +6,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 CHROMA_PATH = "chroma_db"
 
@@ -55,8 +55,8 @@ def load_chain():
         return_messages=True
     )
 
-    llm = ChatOpenAI(
-        model="gpt-3.5-turbo",
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
         temperature=0
     )
 
