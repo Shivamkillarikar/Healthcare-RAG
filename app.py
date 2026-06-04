@@ -18,6 +18,13 @@ st.set_page_config(
 st.title("🩺 AI Healthcare Assistant")
 st.markdown("Upload medical PDFs and ask healthcare-related questions.")
 
+role_colors = {
+    "Patient":  "🟢 Patient Mode  — Simple language",
+    "Doctor":   "🔵 Doctor Mode   — Clinical detail",
+    "Admin":    "🟠 Admin Mode    — Administrative focus",
+}
+st.info(role_colors.get(st.session_state.get("role", "Patient")))
+
 # Session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -53,7 +60,7 @@ with st.sidebar:
             try:
                 with st.spinner("Processing PDF..."):
                     process_pdf(temp_path)
-                    retriever, chain = load_chain()
+                    retriever, chain = load_chain(role=st.session_state.role)
                     st.session_state.retriever = retriever
                     st.session_state.chain = chain
                     st.session_state.processed_file = uploaded_file.name
@@ -66,14 +73,25 @@ with st.sidebar:
         else:
             st.info(f"✓ {uploaded_file.name} already loaded.")
 
+
+    # In sidebar, detect role change and rebuild chain
+    if st.session_state.get("current_role") != role and st.session_state.chain:
+        retriever, chain = load_chain(role=role)
+        st.session_state.retriever = retriever
+        st.session_state.chain = chain
+        st.session_state.current_role = role
+        st.session_state.chat_history = []
+        st.info(f"Switched to {role} mode.")
+
     if st.session_state.chain:
         if st.button("Clear chat"):
             st.session_state.chat_history = []
 
 # Display chat history
+# ✅ Rename the loop variable
 for sender, message in st.session_state.chat_history:
-    role = "user" if sender == "You" else "assistant"
-    with st.chat_message(role):
+    msg_role = "user" if sender == "You" else "assistant"
+    with st.chat_message(msg_role):
         if isinstance(message, dict):
             st.write(message["answer"])
             if message.get("sources"):
