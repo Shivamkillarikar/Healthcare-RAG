@@ -28,6 +28,16 @@ if "chain" not in st.session_state:
 if "processed_file" not in st.session_state:
     st.session_state.processed_file = None
 
+
+with st.sidebar:
+    st.header("Select Role")
+    role = st.selectbox(
+        "I am a...",
+        ["Patient", "Doctor", "Admin"],
+        index=0
+    )
+    st.session_state.role = role
+
 # Sidebar
 with st.sidebar:
     st.header("Upload PDF")
